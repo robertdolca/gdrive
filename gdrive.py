@@ -173,7 +173,7 @@ def print_tree(parent, ident='├── ', is_root=True):
                     else:
                         new_indent = '|   ' + new_indent
                 else:
-                    new_indent = '|   ' + ident
+                    new_indent = rreplace(ident, '├──', '|   ├──')
 
                 new_counts = print_tree(item, new_indent, False)
 
