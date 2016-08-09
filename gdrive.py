@@ -407,11 +407,14 @@ def add_orphan_items_to_folder(service, folder_path):
 
     mine_folder_id = get_or_create_folder(service, folder_path + '/Mine')
 
-    shareable_link_only_folder_id = get_or_create_folder(service, folder_path + '/Link only - Shareable')
-    restructioned_link_only_folder_id = get_or_create_folder(service, folder_path + '/Link only - Restrictioned')
+    shareable_links_folder_id = get_or_create_folder(service,
+                                                     folder_path + '/Link only - Shareable')
+    restructioned_links_folder_id = get_or_create_folder(service,
+                                                         folder_path + '/Link only - Restrictioned')
 
     shareable_folder_id = get_or_create_folder(service, folder_path + '/Shared with me - Shareable')
-    restrictioned_folder_id = get_or_create_folder(service, folder_path + '/Shared with me - Restrictioned')
+    restrictioned_folder_id = get_or_create_folder(service,
+                                                   folder_path + '/Shared with me - Restrictioned')
 
     items = get_all_files(service, 'trashed = false')
     print('Total files count %d' % len(items))
@@ -431,9 +434,9 @@ def add_orphan_items_to_folder(service, folder_path):
                 add_file_parents(service, item['id'], mine_folder_id)
             elif not permission:
                 if can_share(item):
-                    add_file_parents(service, item['id'], shareable_link_only_folder_id)
+                    add_file_parents(service, item['id'], shareable_links_folder_id)
                 else:
-                    add_file_parents(service, item['id'], restructioned_link_only_folder_id)
+                    add_file_parents(service, item['id'], restructioned_links_folder_id)
             else:
                 if can_share(item):
                     add_file_parents(service, item['id'], shareable_folder_id)
@@ -441,7 +444,8 @@ def add_orphan_items_to_folder(service, folder_path):
                     add_file_parents(service, item['id'], restrictioned_folder_id)
 
     print('Adding owned files to mine too')
-    folder_ids = [shareable_link_only_folder_id, restructioned_link_only_folder_id, shareable_folder_id, restrictioned_folder_id]
+    folder_ids = [shareable_links_folder_id, restructioned_links_folder_id, shareable_folder_id,
+                  restrictioned_folder_id]
 
     items = []
     for folder_id in folder_ids:
