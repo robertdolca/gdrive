@@ -139,6 +139,12 @@ def files_with_parent(service, parent, max_depth=None, depth=0, path=None):
 
     return result
 
+def list_my_files_with_parent(service, parent, max_depth=None):
+    root = files_with_parent(service, parent, max_depth)
+    files = []
+    for_each_file(root, True, True, lambda item: files.append(item) if is_my_file(item) else None)
+    return files
+
 def print_tree(parent, ident='├── ', is_root=True):
     directories_count = 0
     files_count = 0
@@ -279,6 +285,9 @@ def file_id_from_path(service, path):
     item = file_from_path(service, path)
     if item:
         return item['id']
+
+def file_from_id(service, file_id):
+    return service.files().get(fileId=file_id).execute()
 
 def file_from_path(service, path, depth=0, parent=None):
     path_files = path.split('/')
@@ -428,6 +437,19 @@ def add_orphan_items_to_folder(service, folder_path):
                     add_file_parents(service, item['id'], shareable_folder_id)
                 else:
                     add_file_parents(service, item['id'], restrictioned_folder_id)
+
+    print('Adding owned files to mine too')
+    folder_ids = [shareable_link_only_folder_id, restructioned_link_only_folder_id, shareable_folder_id, restrictioned_folder_id]
+
+    items = []
+    for folder_id in folder_ids:
+        items += list_my_files_with_parent(service, file_from_id(service, folder_id))
+
+    print('%d files found' % len(items) - 4)
+
+    for item in items:
+        if item['id'] not in folder_ids:
+            add_file_parents(service, item['id'], mine_folder_id)
 
 def add_file_parents(service, file_id, folder_id):
     return service.parents().insert(fileId=file_id, body={'id': folder_id}).execute()
