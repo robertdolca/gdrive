@@ -377,6 +377,32 @@ def change_owner_remove_access(service, root_path, new_owner_email):
     for_each_file(root, True, True, lambda item: change_owner_remove_access_item(service, \
                          my_email, new_owner_email, new_owner_id, item))
 
+
+def change_owner_item(service, old_owner_email, new_owner_email, new_owner_id, item):
+    print(item['title'])
+
+    if item['owners'][0]['emailAddress'] != old_owner_email:
+        return
+
+    if is_downloadable(item):
+        download_file(service, item)
+        trash_file(service, item['id'])
+    else:
+        share_with(service, item['id'], new_owner_email)
+        make_owner(service, item['id'], new_owner_id)
+
+def change_owner(service, root_path, new_owner_email):
+    my_email = get_my_email(service)
+
+    root = file_from_path(service, root_path)
+    root = files_with_parent(service, root)
+
+    print_tree(root)
+
+    new_owner_id = get_permission_id(service, new_owner_email)
+    for_each_file(root, True, True, lambda item: change_owner_item(service, \
+                         my_email, new_owner_email, new_owner_id, item))
+
 def create_folder(service, name, parent_id=None):
     metadata = {
         'title' : name,
