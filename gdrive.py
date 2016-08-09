@@ -365,7 +365,9 @@ def change_owner_remove_access_item(service, old_owner_email, new_owner_email, n
     else:
         remove_permission_with_email(service, item['id'], old_owner_email)
 
-def change_owner_remove_access(service, root_path, old_owner_email, new_owner_email):
+def change_owner_remove_access(service, root_path, new_owner_email):
+    my_email = get_my_email(service)
+
     root = file_from_path(service, root_path)
     root = files_with_parent(service, root)
 
@@ -373,7 +375,7 @@ def change_owner_remove_access(service, root_path, old_owner_email, new_owner_em
 
     new_owner_id = get_permission_id(service, new_owner_email)
     for_each_file(root, True, True, lambda item: change_owner_remove_access_item(service, \
-                         old_owner_email, new_owner_email, new_owner_id, item))
+                         my_email, new_owner_email, new_owner_id, item))
 
 def create_folder(service, name, parent_id=None):
     metadata = {
