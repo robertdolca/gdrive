@@ -200,16 +200,28 @@ def get_permission_id(service, email):
                 .execute()['id']
 
 def remove_permission_with_id(service, file_id, permission_id):
-    return  service \
+    return service \
                 .permissions() \
                 .delete(fileId=file_id, permissionId=permission_id) \
                 .execute()
+
+def get_user_permission_role(service, file_id, email):
+    permissions = get_file_permissions(service, file_id)
+    for permission in permissions:
+        if 'emailAddress' in permission and permission['emailAddress'] == email:
+            return permission['role']
+
+def get_my_permission_role(item):
+    return item['userPermission']['role']
 
 def remove_permission_with_email(service, file_id, email):
     permissions = get_file_permissions(service, file_id)
     for permission in permissions:
         if 'emailAddress' in permission and permission['emailAddress'] == email:
-            remove_permission_with_id(service, file_id, permission['id'])
+            return remove_permission_with_id(service, file_id, permission['id'])
+
+def can_share(item):
+    return item['writersCanShare'] and get_my_permission_role(item) in ['writer', 'owner']
 
 def share_with(service, file_id, email, role='writer', send_notification_emails=False):
     body = {}
@@ -262,6 +274,11 @@ def for_each_file(item, apply_to_file, apply_to_folder, function, reverse=True):
 
     if reverse:
         apply_function(item, apply_to_file, apply_to_folder, function)
+
+def file_id_from_path(service, path):
+    item = file_from_path(service, path)
+    if item:
+        return item['id']
 
 def file_from_path(service, path, depth=0, parent=None):
     path_files = path.split('/')
@@ -349,8 +366,41 @@ def change_owner_remove_access(service, root_path, old_owner_email, new_owner_em
     for_each_file(root, True, True, lambda item: change_owner_remove_access_item(service, \
                          old_owner_email, new_owner_email, new_owner_id, item))
 
+def create_folder(service, name, parent_id=None):
+    metadata = {
+        'title' : name,
+        'mimeType' : 'application/vnd.google-apps.folder'
+    }
+
+    if parent_id:
+        metadata['parents'] = [{'id': parent_id}]
+
+    data = service.files().insert(body=metadata, fields='id').execute()
+    return data.get('id')
+
+def get_or_create_folder(service, path):
+    path = path.strip('/')
+
+    folder_id = file_id_from_path(service, path)
+
+    if not folder_id:
+        parent_path = os.path.dirname(path)
+        parent_id = file_id_from_path(service, parent_path)
+        folder_name = os.path.basename(path)
+        folder_id = create_folder(service, folder_name, parent_id)
+
+    return folder_id
+
 def add_orphan_items_to_folder(service, folder_path):
-    folder = file_from_path(service, folder_path)
+    my_email = get_my_email(service)
+
+    mine_folder_id = get_or_create_folder(service, folder_path + '/Mine')
+
+    shareable_link_only_folder_id = get_or_create_folder(service, folder_path + '/Link only - Shareable')
+    restructioned_link_only_folder_id = get_or_create_folder(service, folder_path + '/Link only - Restrictioned')
+
+    shareable_folder_id = get_or_create_folder(service, folder_path + '/Shared with me - Shareable')
+    restrictioned_folder_id = get_or_create_folder(service, folder_path + '/Shared with me - Restrictioned')
 
     items = get_all_files(service, 'trashed = false')
     print('Total files count %d' % len(items))
@@ -365,16 +415,38 @@ def add_orphan_items_to_folder(service, folder_path):
     for item in items:
         if not len(item['parents']):
             print(item['title'])
-            add_to_my_drive(service, item['id'], folder['id'])
+            permission = get_user_permission_role(service, item['id'], my_email)
+            if permission == 'owner':
+                add_file_parents(service, item['id'], mine_folder_id)
+            elif not permission:
+                if can_share(item):
+                    add_file_parents(service, item['id'], shareable_link_only_folder_id)
+                else:
+                    add_file_parents(service, item['id'], restructioned_link_only_folder_id)
+            else:
+                if can_share(item):
+                    add_file_parents(service, item['id'], shareable_folder_id)
+                else:
+                    add_file_parents(service, item['id'], restrictioned_folder_id)
 
-def add_to_my_drive(service, file_id, folder_id):
+def add_file_parents(service, file_id, folder_id):
     return service.parents().insert(fileId=file_id, body={'id': folder_id}).execute()
 
-def add_file_to_folder(service, item, folder_id):
-    return service.files().update(
-        fileId=item['id'],
-        addParents=folder_id,
-        removeParents=item['parents']).execute()
+def share_if_allowed(service, item, email, role='writer', notify_user=False):
+    if not can_share(item):
+        return
+
+    permission = get_user_permission_role(service, item['id'], email)
+
+    if permission != role:
+        share_with(service, item['id'], email, role, notify_user)
+
+def is_my_file(item):
+    return get_my_permission_role(item) == 'owner'
+
+def get_my_email(service):
+    about = service.about().get().execute()
+    return about['user']['emailAddress']
 
 def json_pretty_print(data):
     print(json.dumps(data, indent=2))
