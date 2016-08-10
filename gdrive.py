@@ -226,6 +226,12 @@ def remove_permission_with_email(service, file_id, email):
         if 'emailAddress' in permission and permission['emailAddress'] == email:
             return remove_permission_with_id(service, file_id, permission['id'])
 
+def remove_all_permissions_except(service, file_id, emails):
+    permissions = get_file_permissions(service, file_id)
+    for permission in permissions:
+        if 'emailAddress' not in permission or permission['emailAddress'] not in emails:
+            remove_permission_with_id(service, file_id, permission['id'])
+
 def can_share(item):
     return item['writersCanShare'] and get_my_permission_role(item) in ['writer', 'owner']
 
